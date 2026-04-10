@@ -19,10 +19,10 @@ async function run() {
 
   const payload = {
     Date_Posted: '2026-04-09T10:15:30.000Z',
-    Landing_Page: 'https://example.com/landing',
+    Landing_Page: 'example.com/landing',
     IP_Address: '203.0.113.10',
     Universal_LeadiD: 'abc123xyz',
-    Trusted_Form_URL: 'https://cert.trustedform.com/123456',
+    Trusted_Form_URL: 'cert.trustedform.com/123456',
     First_Name: 'Jane',
     Last_Name: 'Doe',
     City: 'Miami',

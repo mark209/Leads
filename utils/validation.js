@@ -19,8 +19,30 @@ const BLOCKED_STATES = new Set([
 ]);
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const URL_REGEX = /^https?:\/\//i;
 const STATE_REGEX = /^[A-Z]{2}$/;
+
+function normalizeUrl(value) {
+  const input = String(value || '').trim();
+
+  if (!input) {
+    return '';
+  }
+
+  if (/^https?:\/\//i.test(input)) {
+    return input;
+  }
+
+  return `https://${input}`;
+}
+
+function isValidUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 function normalizeLead(rawLead) {
   return {
@@ -28,7 +50,9 @@ function normalizeLead(rawLead) {
     Email: String(rawLead.Email || '').trim().toLowerCase(),
     Primary_Phone: String(rawLead.Primary_Phone || '').replace(/\D/g, ''),
     State: String(rawLead.State || '').trim().toUpperCase(),
-    Total_Debt: Number(rawLead.Total_Debt)
+    Total_Debt: Number(rawLead.Total_Debt),
+    Landing_Page: normalizeUrl(rawLead.Landing_Page),
+    Trusted_Form_URL: normalizeUrl(rawLead.Trusted_Form_URL)
   };
 }
 
@@ -62,7 +86,7 @@ function validateLeadPayload(lead) {
     };
   }
 
-  if (!URL_REGEX.test(lead.Landing_Page) || !URL_REGEX.test(lead.Trusted_Form_URL)) {
+  if (!isValidUrl(lead.Landing_Page) || !isValidUrl(lead.Trusted_Form_URL)) {
     return {
       valid: false,
       statusCode: 400,
