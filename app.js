@@ -8,6 +8,7 @@ function buildApp({ googleSheetsService, fingerprintCache }) {
 
   app.locals.googleSheetsService = googleSheetsService;
   app.locals.fingerprintCache = fingerprintCache;
+  app.locals.inFlightFingerprints = new Set();
 
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });

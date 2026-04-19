@@ -33,7 +33,20 @@ async function run() {
     Total_Debt: 15000
   };
 
+  const concurrencyPayload = {
+    ...payload,
+    Universal_LeadiD: 'concurrent-test-001',
+    Email: 'concurrent@example.com'
+  };
+
   const tests = [
+    {
+      name: 'concurrent duplicates (only one append)',
+      body: concurrencyPayload,
+      expectedCode: 200,
+      expectedReason: null,
+      concurrent: 10
+    },
     {
       name: 'accepted lead',
       body: payload,
@@ -74,15 +87,36 @@ async function run() {
   let failed = 0;
 
   for (const test of tests) {
-    const response = await fetch(`${baseUrl}/api/leads`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(test.body)
-    });
+    const runOnce = async () => {
+      const response = await fetch(`${baseUrl}/api/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(test.body)
+      });
+      const data = await response.json();
+      return { status: response.status, data };
+    };
 
-    const data = await response.json();
+    if (test.concurrent) {
+      const results = await Promise.all(Array.from({ length: test.concurrent }, runOnce));
+      const acceptedCount = results.filter((r) => r.status === 200 && r.data?.status === 'accepted').length;
+      const duplicateCount = results.filter((r) => r.status === 409 && r.data?.reason === 'DUPLICATE_LEAD').length;
 
-    const codeOk = response.status === test.expectedCode;
+      if (acceptedCount === 1 && acceptedCount + duplicateCount === test.concurrent) {
+        console.log(`PASS: ${test.name}`);
+      } else {
+        failed += 1;
+        console.log(`FAIL: ${test.name}`);
+        console.log(`  accepted=${acceptedCount} duplicate=${duplicateCount} total=${test.concurrent}`);
+        console.log(`  sample: ${JSON.stringify(results[0])}`);
+      }
+
+      continue;
+    }
+
+    const { status, data } = await runOnce();
+
+    const codeOk = status === test.expectedCode;
     const reasonOk = test.expectedReason ? data.reason === test.expectedReason : data.status === 'accepted';
 
     if (codeOk && reasonOk) {
@@ -90,16 +124,16 @@ async function run() {
     } else {
       failed += 1;
       console.log(`FAIL: ${test.name}`);
-      console.log(`  expected status ${test.expectedCode}, got ${response.status}`);
+      console.log(`  expected status ${test.expectedCode}, got ${status}`);
       console.log(`  response: ${JSON.stringify(data)}`);
     }
   }
 
-  if (mockService.appendLeadCalls.length !== 1) {
+  if (mockService.appendLeadCalls.length !== 2) {
     failed += 1;
-    console.log(`FAIL: appendLead expected 1 call, got ${mockService.appendLeadCalls.length}`);
+    console.log(`FAIL: appendLead expected 2 calls, got ${mockService.appendLeadCalls.length}`);
   } else {
-    console.log('PASS: appendLead invoked once for accepted lead');
+    console.log('PASS: appendLead invoked expected number of times');
   }
 
   server.close();

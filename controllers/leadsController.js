@@ -6,6 +6,8 @@ const {
 } = require('../utils/validation');
 
 async function createLead(req, res) {
+  const inFlightFingerprints = req.app.locals.inFlightFingerprints;
+
   try {
     const normalizedLead = normalizeLead(req.body || {});
     const validation = validateLeadPayload(normalizedLead);
@@ -24,6 +26,13 @@ async function createLead(req, res) {
     const fingerprint = buildFingerprint(normalizedLead);
     const fingerprintCache = req.app.locals.fingerprintCache;
 
+    if (inFlightFingerprints.has(fingerprint)) {
+      return res.status(409).json({
+        status: 'rejected',
+        reason: 'DUPLICATE_LEAD'
+      });
+    }
+
     if (fingerprintCache.has(fingerprint)) {
       return res.status(409).json({
         status: 'rejected',
@@ -31,8 +40,13 @@ async function createLead(req, res) {
       });
     }
 
-    await req.app.locals.googleSheetsService.appendLead(normalizedLead, fingerprint);
-    fingerprintCache.add(fingerprint);
+    inFlightFingerprints.add(fingerprint);
+    try {
+      await req.app.locals.googleSheetsService.appendLead(normalizedLead, fingerprint);
+      fingerprintCache.add(fingerprint);
+    } finally {
+      inFlightFingerprints.delete(fingerprint);
+    }
 
     return res.status(200).json({
       status: 'accepted'
